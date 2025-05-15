@@ -1,3 +1,59 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin - Mercato Buoni Mensa</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f2f2f2; margin: 0; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 30px; }
+    #admin { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    label, input, select { display: block; margin: 10px 0; width: 100%; }
+    input[type="password"], input[type="number"] { padding: 8px; }
+    button { margin-top: 10px; padding: 10px; cursor: pointer; background: #007bff; border: none; color: white; border-radius: 4px; }
+    button:hover { background: #0056b3; }
+    #login { text-align: center; margin-bottom: 40px; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #007bff; color: white; }
+    #transactionTable button { background: #dc3545; }
+    #transactionTable button:hover { background: #a71d2a; }
+  </style>
+</head>
+<body>
+
+<h1>Area Riservata - Gestione Transazioni</h1>
+
+<div id="login">
+  <input type="password" id="passwordInput" placeholder="Password">
+  <button onclick="checkPassword()">Accedi</button>
+</div>
+
+<div id="admin" style="display:none;">
+  <label>Tipo:
+    <select id="type">
+      <option value="vendita">Vendita</option>
+      <option value="richiesta">Richiesta</option>
+    </select>
+  </label>
+  <label>Quantità blocchetti:
+    <input type="number" id="quantity" min="1" />
+  </label>
+  <label>Prezzo:
+    <input type="number" id="price" min="0.01" step="0.01" />
+  </label>
+  <label>Tipo prezzo:
+    <select id="priceType">
+      <option value="totale">Totale</option>
+      <option value="parziale">Parziale</option>
+    </select>
+  </label>
+  <button onclick="addTransaction()">Inserisci</button>
+
+  <table id="transactionTable"></table>
+</div>
+
 <script>
   // FIREBASE CONFIGURA QUI (stesso config)
   const firebaseConfig = {
@@ -43,20 +99,15 @@
       unitPrice = price / 10;
     }
 
-    try {
-      await db.collection("transactions").add({
-        type,
-        quantity,
-        totalPrice: price,
-        unitPrice: parseFloat(unitPrice.toFixed(2)),
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      alert("Transazione inserita con successo");
-      loadTable();
-    } catch (e) {
-      console.error("Errore inserimento:", e);
-      alert("Errore durante l'inserimento");
-    }
+    await db.collection("transactions").add({
+      type,
+      quantity,
+      totalPrice: price,
+      unitPrice: parseFloat(unitPrice.toFixed(2)),
+      timestamp: new Date()
+    });
+
+    loadTable();
   }
 
   async function loadTable() {
@@ -70,45 +121,36 @@
       <th>Azioni</th>
     </tr>`;
 
-    try {
-      const snapshot = await db.collection("transactions").orderBy("timestamp", "desc").get();
-      if (snapshot.empty) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="6">Nessuna transazione presente</td>`;
-        table.appendChild(tr);
-        return;
-      }
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        let dateStr = "-";
-        if (d.timestamp && d.timestamp.toDate) {
-          dateStr = d.timestamp.toDate().toLocaleString("it-IT");
-        }
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${d.type}</td>
-          <td>${d.quantity}</td>
-          <td>${d.totalPrice.toFixed(2)}</td>
-          <td>${d.unitPrice.toFixed(2)}</td>
-          <td>${dateStr}</td>
-          <td><button onclick="deleteTransaction('${doc.id}')">Elimina</button></td>
-        `;
-        table.appendChild(row);
-      });
-    } catch(e) {
-      console.error("Errore caricamento dati:", e);
-      alert("Errore durante il caricamento dati");
-    }
+    const snapshot = await db.collection("transactions").orderBy("timestamp", "desc").get();
+
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const dateObj = d.timestamp.toDate ? d.timestamp.toDate() : new Date(d.timestamp);
+      const dateStr = dateObj.toLocaleString("it-IT");
+
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${d.type}</td>
+        <td>${d.quantity}</td>
+        <td>${d.totalPrice.toFixed(2)}</td>
+        <td>${d.unitPrice.toFixed(2)}</td>
+        <td>${dateStr}</td>
+        <td><button onclick="deleteTransaction('${doc.id}')">Elimina</button></td>
+      `;
+
+      table.appendChild(row);
+    });
   }
 
   async function deleteTransaction(id) {
-    if (!confirm("Sei sicuro di voler eliminare questa transazione?")) return;
-    try {
+    if (confirm("Sei sicuro di voler eliminare questa transazione?")) {
       await db.collection("transactions").doc(id).delete();
       loadTable();
-    } catch(e) {
-      console.error("Errore eliminazione:", e);
-      alert("Errore durante l'eliminazione");
     }
   }
 </script>
+
+</body>
+</html>
+
